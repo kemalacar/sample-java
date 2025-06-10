@@ -52,5 +52,5 @@ jobs:
 
           region: ${{ secrets.AWS_REGION }}
 
-          deployment_package: target/springboot-example.jar
+          deployment_package: target/demo-0.0.1-SNAPSHOT.jar
  
