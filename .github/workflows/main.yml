@@ -74,7 +74,7 @@ jobs:
     - name: Download Artifact
       uses: actions/download-artifact@v4
       with:
-        name: java-app
+        name: ${{DEPLOYMENT_PACKAGE_NAME}}
 
     - name: Display structure of downloaded files
       run: ls -R
