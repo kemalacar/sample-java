@@ -7,7 +7,7 @@ on:
     branches: [ "main" ]
 env:
   # Dinamik isim için ${{ github.sha }} kullanabiliriz.
-  JAR_FILE_PATH: target/sample-java.jar # Kendi JAR dosyanızın yolu ve adını yazın
+  JAR_FILE_PATH: target/demo-0.0.1-SNAPSHOT.jar # Kendi JAR dosyanızın yolu ve adını yazın
   DEPLOYMENT_PACKAGE_NAME: sample-java_${{ github.sha }}.zip # S3'e yüklenecek paketin adı
   S3_ARTIFACT_BUCKET: bbalta-aws-bucket
 jobs:
