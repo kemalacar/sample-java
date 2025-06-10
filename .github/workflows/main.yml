@@ -59,5 +59,7 @@ jobs:
     - name: Deploy to AWS Elastic Beanstalk
       run: |
          aws elasticbeanstalk create-application-version --application-name sample-java --version-label "ver-${{ github.sha }}" --source-bundle S3Bucket="bbalta-aws-bucket",S3Key="sample-java/ver-${{ github.sha }}.jar"
+         echo "step 2"
          aws elasticbeanstalk update-environment --application-name sample-java --environment-name your-env --version-label "ver-${{ github.sha }}"
+         echo "step 3"
     
