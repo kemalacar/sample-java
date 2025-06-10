@@ -5,7 +5,11 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
-
+env:
+  # Dinamik isim için ${{ github.sha }} kullanabiliriz.
+  JAR_FILE_PATH: target/sample-java.jar # Kendi JAR dosyanızın yolu ve adını yazın
+  DEPLOYMENT_PACKAGE_NAME: sample-java_${{ github.sha }}.zip # S3'e yüklenecek paketin adı
+  S3_ARTIFACT_BUCKET: bbalta-aws-bucket
 jobs:
   build_and_test:
     name: Build and Test
@@ -25,11 +29,27 @@ jobs:
     - name: Build with Maven
       run: mvn -B package --file pom.xml
 
-    - name: Upload Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: java-app
-        path: target/*.jar
+    - name: Check if JAR file exists
+      run: |
+          if [ -f "${{ env.JAR_FILE_PATH }}" ]; then
+            echo "JAR file found at ${{ env.JAR_FILE_PATH }}"
+          else
+            echo "Error: JAR file not found at ${{ env.JAR_FILE_PATH }}. Please check build output."
+            exit 1
+          fi
+
+    - name: Create deployment package (for CodeDeploy/Elastic Beanstalk)
+      run: |
+          # appspec.yml ve scripts klasörünü JAR ile birlikte ZIP'le
+          # Eğer JAR dosyanız env.JAR_FILE_PATH içinde ve hedef dizinde ise
+          # Örneğin: target/your-app-name.jar
+          # appspec.yml ve scripts/ dosyaları projenizin kökünde olmalı
+          zip -r ${{ env.DEPLOYMENT_PACKAGE_NAME }} ${{ env.JAR_FILE_PATH }} appspec.yml scripts/
+          ls -lh ${{ env.DEPLOYMENT_PACKAGE_NAME }} # Kontrol için
+     
+    - name: Upload deployment package to S3
+      run:  aws s3 cp ${{ env.DEPLOYMENT_PACKAGE_NAME }} s3://${{ env.S3_ARTIFACT_BUCKET }}/deploy_artifacts/${{ env.DEPLOYMENT_PACKAGE_NAME }}
+
 
   deploy_to_aws:
     name: Deploy to AWS
@@ -56,8 +76,8 @@ jobs:
          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
          aws-region: ${{ secrets.AWS_REGION }}
    
-    - name: Upload deployment package to S3
-      run: aws s3 cp deploy_package.zip s3://bbalta-aws-bucket/deploy_artifacts/${{ github.sha }}.zip
+   # - name: Upload deployment package to S3
+    #  run: aws s3 demo-0.0.1-SNAPSHOT.jar s3://bbalta-aws-bucket/deploy_artifacts/${{ github.sha }}.zip
         
     - name: Deploy to AWS Elastic Beanstalk
       run: |
