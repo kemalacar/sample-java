@@ -55,7 +55,10 @@ jobs:
          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
          aws-region: ${{ secrets.AWS_REGION }}
- 
+   
+    - name: Upload deployment package to S3
+      run: aws s3 cp deploy_package.zip s3://bbalta-aws-bucket/deploy_artifacts/${{ github.sha }}.zip
+        
     - name: Deploy to AWS Elastic Beanstalk
       run: |
          aws elasticbeanstalk create-application-version --application-name sample-java --version-label "ver-${{ github.sha }}" --source-bundle S3Bucket="bbalta-aws-bucket",S3Key="sample-java/ver-${{ github.sha }}.jar"
