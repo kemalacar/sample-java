@@ -1,93 +1,56 @@
-name: CI-CD Pipeline for Spring Boot App
-
+name: Deploy to Elastic Beanstalk
+ 
 on:
+
   push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
-env:
-  # Dinamik isim için ${{ github.sha }} kullanabiliriz.
-  JAR_FILE_PATH: target/demo-0.0.1-SNAPSHOT.jar # Kendi JAR dosyanızın yolu ve adını yazın
-  DEPLOYMENT_PACKAGE_NAME: sample-java_${{ github.sha }}.zip # S3'e yüklenecek paketin adı
-  S3_ARTIFACT_BUCKET: bbalta-aws-bucket
-    # --- Elastic Beanstalk Ortam Değişkenleri (Eğer Elastic Beanstalk kullanacaksanız) ---
-  BEANSTALK_APP_NAME: MyBeanstalkApp # Elastic Beanstalk uygulamanızın adı
-  BEANSTALK_ENV_NAME: MyBeanstalkEnv # Elastic Beanstalk ortamınızın adı
-  
+
+    branches:
+
+      - deploy-to-elastic-beanstalk
+ 
 jobs:
-  build_and_test:
-    name: Build and Test
+
+  build-and-deploy:
+
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
 
-    - name: Set up JDK 21
-      uses: actions/setup-java@v4
-      with:
-        java-version: '21'
-        distribution: 'temurin'
-        cache: maven
+      - name: Checkout Source
 
-    - name: Build with Maven
-      run: mvn -B package --file pom.xml
+        uses: actions/checkout@v4
 
-   
-    - name: Check if JAR file exists
-      run: |
-          if [ -f "${{ env.JAR_FILE_PATH }}" ]; then
-            echo "JAR file found at ${{ env.JAR_FILE_PATH }}"
-          else
-            echo "Error: JAR file not found at ${{ env.JAR_FILE_PATH }}. Please check build output."
-            exit 1
-          fi
+      - name: Setup Java
 
-    - name: Create deployment package (for CodeDeploy/Elastic Beanstalk)
-      run: |
-          # appspec.yml ve scripts klasörünü JAR ile birlikte ZIP'le
-          # Eğer JAR dosyanız env.JAR_FILE_PATH içinde ve hedef dizinde ise
-          # Örneğin: target/your-app-name.jar
-          # appspec.yml ve scripts/ dosyaları projenizin kökünde olmalı
-          zip -r ${{ env.DEPLOYMENT_PACKAGE_NAME }} ${{ env.JAR_FILE_PATH }} appspec.yml scripts/
-          ls -lh ${{ env.DEPLOYMENT_PACKAGE_NAME }} # Kontrol için
+        uses: actions/setup-java@v4
 
+        with:
 
-    - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-         aws-region: ${{ secrets.AWS_REGION }}
-    
-    - name: Upload deployment package to S3
-      run:  aws s3 cp ${{ env.DEPLOYMENT_PACKAGE_NAME }} s3://${{ env.S3_ARTIFACT_BUCKET }}/deploy_artifacts/${{ env.DEPLOYMENT_PACKAGE_NAME }}
+          distribution: 'temurin'
 
+          java-version: '21'
 
-  deploy_to_aws:
-    name: Deploy to AWS
-    needs: build_and_test
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      - name: Build Project
 
-    steps:
-    - name: Download Artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: ${{DEPLOYMENT_PACKAGE_NAME}}
+        run: mvn clean install -DskipTests
 
-    - name: Display structure of downloaded files
-      run: ls -R
-    
-    - name: Deployment Step Placeholder
-      run: echo "Artifact downloaded. Add AWS deployment commands here."
-   
-   
-    - name: Deploy to AWS Elastic Beanstalk
-      run: |
-         aws elasticbeanstalk create-application-version --application-name ${{ env.BEANSTALK_APP_NAME }} --version-label "v-${{ github.sha }}" --source-bundle S3Bucket=${{ env.S3_ARTIFACT_BUCKET }},S3Key=deploy_artifacts/${{ env.DEPLOYMENT_PACKAGE_NAME }}
-        # aws elasticbeanstalk create-application-version --application-name sample-java --version-label "ver-${{ github.sha }}" --source-bundle S3Bucket="bbalta-aws-bucket",S3Key="sample-java/ver-${{ github.sha }}.jar"
-        
-        #aws elasticbeanstalk update-environment --application-name sample-java --environment-name your-env --version-label "ver-${{ github.sha }}"
-        
-    
+      - name: Deploy to EB
+
+        uses: einaregilsson/beanstalk-deploy@v21
+
+        with:
+
+          aws_access_key: ${{ secrets.AWS_ACCESS_KEY }}
+
+          aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+          application_name: 'MyBeanstalkApp'
+
+          environment_name: 'MyBeanstalkEnv'
+
+          version_label: ${{ github.sha }}
+
+          region: ${{ secrets.AWS_REGION }}
+
+          deployment_package: target/springboot-example.jar
+ 
