@@ -10,6 +10,10 @@ env:
   JAR_FILE_PATH: target/demo-0.0.1-SNAPSHOT.jar # Kendi JAR dosyanızın yolu ve adını yazın
   DEPLOYMENT_PACKAGE_NAME: sample-java_${{ github.sha }}.zip # S3'e yüklenecek paketin adı
   S3_ARTIFACT_BUCKET: bbalta-aws-bucket
+    # --- Elastic Beanstalk Ortam Değişkenleri (Eğer Elastic Beanstalk kullanacaksanız) ---
+  BEANSTALK_APP_NAME: MyBeanstalkApp # Elastic Beanstalk uygulamanızın adı
+  BEANSTALK_ENV_NAME: MyBeanstalkEnv # Elastic Beanstalk ortamınızın adı
+  
 jobs:
   build_and_test:
     name: Build and Test
@@ -79,13 +83,11 @@ jobs:
       run: echo "Artifact downloaded. Add AWS deployment commands here."
    
    
-   # - name: Upload deployment package to S3
-    #  run: aws s3 demo-0.0.1-SNAPSHOT.jar s3://bbalta-aws-bucket/deploy_artifacts/${{ github.sha }}.zip
-        
     - name: Deploy to AWS Elastic Beanstalk
       run: |
-         aws elasticbeanstalk create-application-version --application-name sample-java --version-label "ver-${{ github.sha }}" --source-bundle S3Bucket="bbalta-aws-bucket",S3Key="sample-java/ver-${{ github.sha }}.jar"
-         echo "step 2"
-         aws elasticbeanstalk update-environment --application-name sample-java --environment-name your-env --version-label "ver-${{ github.sha }}"
-         echo "step 3"
+         aws elasticbeanstalk create-application-version --application-name ${{ env.BEANSTALK_APP_NAME }} --version-label "v-${{ github.sha }}" --source-bundle S3Bucket=${{ env.S3_ARTIFACT_BUCKET }},S3Key=deploy_artifacts/${{ env.DEPLOYMENT_PACKAGE_NAME }}
+        # aws elasticbeanstalk create-application-version --application-name sample-java --version-label "ver-${{ github.sha }}" --source-bundle S3Bucket="bbalta-aws-bucket",S3Key="sample-java/ver-${{ github.sha }}.jar"
+        
+        #aws elasticbeanstalk update-environment --application-name sample-java --environment-name your-env --version-label "ver-${{ github.sha }}"
+        
     
