@@ -1,4 +1,4 @@
-name: Deploy to Elastic Beanstalk
+name: Deploy Spring Boot to AWS Elastic Beanstalk
 
 on:
   push:
@@ -12,12 +12,24 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
+    - name: Set up Java
+      uses: actions/setup-java@v4
       with:
-        python-version: '3.x'
+        distribution: 'temurin'
+        java-version: '21' 
 
-    - name: Install AWS CLI and EB CLI
+    - name: Build with Maven
+      run: mvn clean package -DskipTests
+
+    - name: Create deployment ZIP
+      run: |
+        mkdir deployment
+        cp target/*.jar deployment/application.jar
+        cd deployment
+        zip -r ../app.zip .
+        cd ..
+
+    - name: Install AWS CLI & EB CLI
       run: |
         pip install --upgrade pip
         pip install awsebcli
@@ -31,8 +43,10 @@ jobs:
 
     - name: Initialize EB CLI
       run: |
-        eb init ${{ secrets.EB_APP_NAME }} --platform "Node.js" --region ${{ secrets.AWS_REGION }}
+        eb init ${{ secrets.EB_APP_NAME }} \
+          --platform "Java" \
+          --region ${{ secrets.AWS_REGION }}
         eb use ${{ secrets.EB_ENV_NAME }}
 
     - name: Deploy to Elastic Beanstalk
-      run: eb deploy
+      run: eb deploy --staged --label "deploy-${{ github.run_number }}"
