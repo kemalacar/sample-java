@@ -45,7 +45,7 @@ jobs:
       run: |
         eb platform list --region ${{ secrets.AWS_REGION }}
         eb init ${{ secrets.EB_APP_NAME }} \
-          --platform "Java" \
+          --platform "corretto-21" \
           --region ${{ secrets.AWS_REGION }}
         eb use ${{ secrets.EB_ENV_NAME }}
 
