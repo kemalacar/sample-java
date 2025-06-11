@@ -21,13 +21,10 @@ jobs:
     - name: Build with Maven
       run: mvn clean package
 
-    - name: Create deployment ZIP
+    - name: Rename JAR for EB
       run: |
-        mkdir deployment
-        cp target/*.jar deployment/application.jar
-        cd deployment
-        zip -r ../app.zip .
-        cd ..
+        mkdir bundle
+        cp target/*.jar bundle/application.jar
 
     - name: Install AWS CLI & EB CLI
       run: |
@@ -49,5 +46,7 @@ jobs:
           --region ${{ secrets.AWS_REGION }}
         eb use ${{ secrets.EB_ENV_NAME }}
 
-    - name: Deploy to Elastic Beanstalk
-      run: eb deploy --staged --label "deploy-${{ github.run_number }}"
+    - name: Deploy JAR directly
+      run: |
+        cd bundle
+        eb deploy --staged
