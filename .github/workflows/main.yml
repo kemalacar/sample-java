@@ -43,7 +43,7 @@ jobs:
 
     - name: Initialize EB CLI
       run: |
-        eb platform list --eu-north-1
+        eb platform list --region ${{ secrets.AWS_REGION }}
         eb init ${{ secrets.EB_APP_NAME }} \
           --platform "Java" \
           --region ${{ secrets.AWS_REGION }}
