@@ -1,56 +1,38 @@
 name: Deploy to Elastic Beanstalk
- 
+
 on:
-
   push:
+    branches: [main]
 
-    branches:
-
-      - main
- 
 jobs:
-
-  build-and-deploy:
-
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
 
-      - name: Checkout Source
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
 
-        uses: actions/checkout@v4
+    - name: Install AWS CLI and EB CLI
+      run: |
+        pip install --upgrade pip
+        pip install awsebcli
 
-      - name: Setup Java
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION }}
 
-        uses: actions/setup-java@v4
+    - name: Initialize EB CLI
+      run: |
+        eb init ${{ secrets.EB_APP_NAME }} --platform "Node.js" --region ${{ secrets.AWS_REGION }}
+        eb use ${{ secrets.EB_ENV_NAME }}
 
-        with:
-
-          distribution: 'temurin'
-
-          java-version: '21'
-
-      - name: Build Project
-
-        run: mvn clean install -DskipTests
-
-      - name: Deploy to EB
-
-        uses: einaregilsson/beanstalk-deploy@v21
-
-        with:
-
-          aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
-
-          aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-
-          application_name: 'MyBeanstalkApp'
-
-          environment_name: 'MyBeanstalkEnv'
-
-          version_label: ${{ github.sha }}
-
-          region: ${{ secrets.AWS_REGION }}
-
-          deployment_package: target/demo-0.0.1-SNAPSHOT.jar
- 
+    - name: Deploy to Elastic Beanstalk
+      run: eb deploy
