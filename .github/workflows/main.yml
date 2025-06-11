@@ -1,52 +1,80 @@
-name: Deploy Spring Boot to AWS Elastic Beanstalk
+name: Deploy Spring Boot JAR to Elastic Beanstalk
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main # main dalına yapılan her push'ta tetiklenir
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  S3_ARTIFACT_BUCKET: bbalta-aws-bucket
+  
+  # Spring Boot JAR dosyasının build sonrası yolu. Projenizin pom.xml/build.gradle'ına göre ayarlayın.
+  # Genellikle Maven için target/, Gradle için build/libs/ altında oluşur.
+  JAR_FILE_PATH: target/demo-0.0.1-SNAPSHOT.jar # <<< BURAYI KENDİ JAR DOSYANIZIN ADIYLA GÜNCELLEYİN >>>
+  DEPLOYMENT_PACKAGE_NAME: spring-app-${{ github.sha }}.zip # S3'e yüklenecek paketin adı
 
 jobs:
-  deploy:
-    runs-on: ubuntu-latest
+  build-and-deploy:
+    runs-on: ubuntu-latest # İş akışının çalışacağı GitHub Runner
+
+    # IAM OIDC ile kimlik doğrulama için gerekli izinler
+    permissions:
+      id-token: write # sts:AssumeRoleWithWebIdentity için gereklidir
+      contents: read # Depodan kodu okumak için gereklidir
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - name: Checkout Code
+        uses: actions/checkout@v4 # Depoyu runner'a kopyalar
 
-    - name: Set up Java
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'corretto'
-        java-version: '21' 
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
-    - name: Build with Maven
-      run: mvn clean package
+      - name: Set up JDK 17 # Java Spring Boot için JDK kurulumu
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21' # Java versiyonunuzu ayarlayın (örn. '11', '21')
+          distribution: 'corretto' # JDK dağıtımını seçin (örn. 'temurin', 'corretto')
+          cache: 'maven' # Maven bağımlılıklarını önbelleğe al (Gradle için 'gradle' kullanın)
 
-    - name: Rename JAR for EB
-      run: |
-        mkdir bundle
-        cp target/*.jar bundle/application.jar
+      - name: Build with Maven # Spring Boot projenizi derleyin
+        run: mvn clean package -DskipTests # Testleri atlayarak derle. Eğer testleriniz varsa -DskipTests kısmını kaldırın.
+        # Eğer Gradle kullanıyorsanız: ./gradlew clean build -x test
 
-    - name: Install AWS CLI & EB CLI
-      run: |
-        pip install --upgrade pip
-        pip install awsebcli
+      - name: Verify JAR file exists
+        run: |
+          if [ -f "${{ env.JAR_FILE_PATH }}" ]; then
+            echo "JAR file found at ${{ env.JAR_FILE_PATH }}"
+          else
+            echo "Error: JAR file not found at ${{ env.JAR_FILE_PATH }}. Please check your build output and JAR_FILE_PATH variable."
+            exit 1
+          fi
 
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v2
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ secrets.AWS_REGION }}
+      - name: Create Elastic Beanstalk deployment package
+        run: |
+          # Spring Boot JAR dosyasını ZIP'e ekle.
+          # '-j' (junk paths) bayrağı, ZIP'e eklenen dosyanın yol yapısını korumaz, sadece dosyanın kendisini ZIP'in köküne koyar.
+          # Bu, Elastic Beanstalk için genellikle tercih edilen yapıdır.
+          zip -j ${{ env.DEPLOYMENT_PACKAGE_NAME }} ${{ env.JAR_FILE_PATH }}
 
-    - name: Initialize EB CLI
-      run: |
-        eb platform list --region ${{ secrets.AWS_REGION }}
-        eb init ${{ secrets.EB_APP_NAME }} \
-          --platform "corretto-21" \
-          --region ${{ secrets.AWS_REGION }}
-        eb use ${{ secrets.EB_ENV_NAME }}
+          # Eğer .ebextensions/ klasörünüz varsa (EB yapılandırması için), onu da ZIP'e ekleyin:
+          # if [ -d ".ebextensions" ]; then
+          #   zip -r ${{ env.DEPLOYMENT_PACKAGE_NAME }} .ebextensions/
+          #   echo ".ebextensions/ added to deployment package."
+          # fi
+          
+          ls -lh ${{ env.DEPLOYMENT_PACKAGE_NAME }} # Kontrol için
 
-    - name: Deploy JAR directly
-      run: |
-        cd bundle
-        eb deploy --staged
+      - name: Upload deployment package to S3
+        run: aws s3 cp ${{ env.DEPLOYMENT_PACKAGE_NAME }} s3://${{ env.S3_ARTIFACT_BUCKET }}/elastic-beanstalk-apps/${{ env.DEPLOYMENT_PACKAGE_NAME }}
+        # S3'e yüklenecek paketin yolu: s3://your-bucket-name/elastic-beanstalk-apps/spring-app-YOUR_SHA.zip
+
+      - name: Create Elastic Beanstalk Application Version
+        run: aws elasticbeanstalk create-application-version --application-name ${{ env.EB_APP_NAME }} --version-label "v-${{ github.sha }}" --source-bundle S3Bucket=${{ env.S3_ARTIFACT_BUCKET }},S3Key=elastic-beanstalk-apps/${{ env.DEPLOYMENT_PACKAGE_NAME }} --description "Deployed by GitHub Actions - ${{ github.event.head_commit.message }}"
+
+      - name: Deploy Elastic Beanstalk Application Version
+        run: aws elasticbeanstalk update-environment --application-name ${{ env.EB_APP_NAME }} --environment-name ${{ env.EB_ENV_NAME }} --version-label "v-${{ github.sha }}"
