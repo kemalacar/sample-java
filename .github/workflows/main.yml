@@ -71,10 +71,9 @@ jobs:
 
       - name: Upload deployment package to S3
         run: aws s3 cp ${{ env.DEPLOYMENT_PACKAGE_NAME }} s3://${{ env.S3_ARTIFACT_BUCKET }}/elastic-beanstalk-apps/${{ env.DEPLOYMENT_PACKAGE_NAME }}
-        # S3'e yüklenecek paketin yolu: s3://your-bucket-name/elastic-beanstalk-apps/spring-app-YOUR_SHA.zip
 
       - name: Create Elastic Beanstalk Application Version
-        run: aws elasticbeanstalk create-application-version --application-name ${{ env.EB_APP_NAME }} --version-label "v-${{ github.sha }}" --source-bundle S3Bucket=${{ env.S3_ARTIFACT_BUCKET }},S3Key=elastic-beanstalk-apps/${{ env.DEPLOYMENT_PACKAGE_NAME }} --description "Deployed by GitHub Actions - ${{ github.event.head_commit.message }}"
+        run: aws elasticbeanstalk create-application-version --application-name ${{ secrets.EB_APP_NAME }} --version-label "v-${{ github.sha }}" --source-bundle S3Bucket=${{ env.S3_ARTIFACT_BUCKET }},S3Key=elastic-beanstalk-apps/${{ env.DEPLOYMENT_PACKAGE_NAME }} --description "Deployed by GitHub Actions - ${{ github.event.head_commit.message }}"
 
       - name: Deploy Elastic Beanstalk Application Version
-        run: aws elasticbeanstalk update-environment --application-name ${{ env.EB_APP_NAME }} --environment-name ${{ env.EB_ENV_NAME }} --version-label "v-${{ github.sha }}"
+        run: aws elasticbeanstalk update-environment --application-name ${{ secrets.EB_APP_NAME }} --environment-name ${{ secrets.EB_ENV_NAME }} --version-label "v-${{ github.sha }}"
